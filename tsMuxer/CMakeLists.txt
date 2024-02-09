@@ -1,7 +1,7 @@
 cmake_minimum_required (VERSION 3.1)
 project (tsmuxer LANGUAGES CXX)
 
-add_executable (tsmuxer
+set (SRC_FILES
   aac.cpp
   aacStreamReader.cpp
   abstractDemuxer.cpp
@@ -45,8 +45,6 @@ add_executable (tsmuxer
   simplePacketizerReader.cpp
   singleFileMuxer.cpp
   srtStreamReader.cpp
-  textSubtitles.cpp
-  textSubtitlesRender.cpp
   tsDemuxer.cpp
   tsMuxer.cpp
   tsPacket.cpp
@@ -57,6 +55,14 @@ add_executable (tsmuxer
   vvc.cpp
   vvcStreamReader.cpp
   wave.cpp
+)
+
+if (NOT APPLE)
+  list(APPEND SRC_FILES textSubtitles.cpp textSubtitlesRender.cpp)
+endif()
+
+add_executable (tsmuxer
+  ${SRC_FILES}
 )
 
 if(TSMUXER_STATIC_BUILD)
@@ -119,7 +125,7 @@ endif()
 if (WIN32)
   target_sources(tsmuxer PRIVATE osdep/textSubtitlesRenderWin32.cpp)
   target_link_libraries(tsmuxer gdiplus)
-else()
+elseif(NOT APPLE)
   target_sources(tsmuxer PRIVATE osdep/textSubtitlesRenderFT.cpp)
   # on osxcross use the static freetype library explicitly
   if(DEFINED OSXCROSS_SDK)
@@ -130,5 +136,8 @@ else()
 endif()
 
 target_link_libraries(tsmuxer mediation ${THREADSLIB} ${ZLIB_LIBRARIES})
+if (APPLE)
+  target_compile_definitions(tsmuxer PRIVATE -DNO_SUBTITLES)
+endif()
 
 install (TARGETS tsmuxer DESTINATION ${CMAKE_INSTALL_BINDIR})

@@ -1,14 +1,17 @@
 #ifndef PGS_STREAM_READER_H_
 #define PGS_STREAM_READER_H_
 
+#include <map>
 #include <vector>
 
 #include "abstractStreamReader.h"
 #include "avCodecs.h"
 #include "avPacket.h"
 #include "bitStream.h"
+#ifndef NO_SUBTITLES
 #include "textSubtitles.h"
 #include "textSubtitlesRender.h"
+#endif
 
 class PGSStreamReader final : public AbstractStreamReader
 {
@@ -17,10 +20,12 @@ class PGSStreamReader final : public AbstractStreamReader
     {
         int Width;
         int Height;
+#ifndef NO_SUBTITLES
 #ifdef _WIN32
         RGBQUAD* buffer;  // rgb triple buffer
 #else
         text_subtitles::RGBQUAD* buffer;
+#endif
 #endif
     };
 
@@ -31,7 +36,9 @@ class PGSStreamReader final : public AbstractStreamReader
         delete[] m_rgbBuffer;
         delete[] m_scaledRgbBuffer;
         delete[] m_renderedData;
+#ifndef NO_SUBTITLES
         delete m_render;
+#endif
     }
     int readPacket(AVPacket& avPacket) override;
     int flushPacket(AVPacket& avPacket) override;
@@ -48,7 +55,11 @@ class PGSStreamReader final : public AbstractStreamReader
     // void setFPS(double value);
     void setVideoInfo(uint16_t width, uint16_t height, double fps);
     void setFontBorder(const int value) { m_fontBorder = value; }
+#ifndef NO_SUBTITLES
     void setBottomOffset(const int value) const { m_render->setBottomOffset(value); }
+#else
+    void setBottomOffset(const int value) const { }
+#endif
     void setOffsetId(const uint8_t value) { m_offsetId = value; }
     [[nodiscard]] uint8_t getOffsetId() const { return m_offsetId; }
 
@@ -116,26 +127,34 @@ class PGSStreamReader final : public AbstractStreamReader
     uint8_t* m_imgBuffer;
     uint8_t* m_rgbBuffer;
     uint8_t* m_scaledRgbBuffer;
+#ifndef NO_SUBTITLES
     std::map<uint8_t, text_subtitles::YUVQuad> m_palette;
+#endif
     uint16_t m_scaled_width;
     uint16_t m_scaled_height;
     bool m_firstRenderedPacket;
 
+#ifndef NO_SUBTITLES
     text_subtitles::TextToPGSConverter* m_render;
+#endif
     uint8_t* m_renderedData;
     std::vector<PGSRenderedBlock> m_renderedBlocks;
 
     std::map<uint16_t, uint16_t> composition_object_horizontal_position;
     std::map<uint16_t, uint16_t> composition_object_vertical_position;
+#ifndef NO_SUBTITLES
     void renderTextShow(int64_t inTime);
     void renderTextHide(int64_t outTime);
+#endif
 
     void video_descriptor(BitStreamReader& bitReader);
     void composition_descriptor(BitStreamReader& bitReader);
     void composition_object(BitStreamReader& bitReader);
     static void pgs_window(BitStreamReader& bitReader);
     void readPalette(const uint8_t* pos, const uint8_t* end);
+#ifndef NO_SUBTITLES
     int readObjectDef(const uint8_t* pos, const uint8_t* end);
+#endif
     void decodeRleData(int xOffset, int yOffset) const;
     void yuvToRgb(int minY) const;
     static void rescaleRGB(const BitmapInfo* bmpDest, const BitmapInfo* bmpRef);

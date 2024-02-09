@@ -10,13 +10,17 @@
 
 using namespace std;
 
+#ifndef NO_SUBTITLES
 using namespace text_subtitles;
+#endif
 
 SRTStreamReader::SRTStreamReader() : m_lastBlock(false), m_short_R(0), m_short_N(0), m_long_R(0), m_long_N(0)
 {
     // in future version here must be case for destination subtitle format (DVB sub, DVD sub e.t.c)
     m_dstSubCodec = new PGSStreamReader();
+#ifndef NO_SUBTITLES
     m_srtRender = new TextToPGSConverter(true);
+#endif
     m_processedSize = 0;
     m_state = ParseState::PARSE_FIRST_LINE;
     m_inTime = m_outTime = 0.0;
@@ -28,10 +32,14 @@ SRTStreamReader::SRTStreamReader() : m_lastBlock(false), m_short_R(0), m_short_N
 SRTStreamReader::~SRTStreamReader()
 {
     delete m_dstSubCodec;
+#ifndef NO_SUBTITLES
     delete m_srtRender;
+#endif
 }
 
+#ifndef NO_SUBTITLES
 void SRTStreamReader::setAnimation(const TextAnimation& animation) { m_animation = animation; }
+#endif
 
 void SRTStreamReader::setBuffer(uint8_t* data, const uint32_t dataLen, const bool lastBlock)
 {
@@ -226,6 +234,7 @@ uint8_t* SRTStreamReader::renderNextMessage(uint32_t& renderedLen)
         m_origSize.pop();
     }
 
+#ifndef NO_SUBTITLES
     if (m_sourceText.empty())
     {
         if (m_lastBlock && !m_renderedText.empty())
@@ -240,6 +249,14 @@ uint8_t* SRTStreamReader::renderNextMessage(uint32_t& renderedLen)
     m_processedSize += m_origSize.front();
     m_origSize.pop();
     rez = m_srtRender->doConvert(m_renderedText, m_animation, m_inTime, m_outTime, renderedLen);
+#else
+    if (!m_sourceText.empty())
+    {
+        m_sourceText.pop();  // delete empty line (messages separator)
+        m_processedSize += m_origSize.front();
+        m_origSize.pop();
+    }
+#endif
     m_state = ParseState::PARSE_FIRST_LINE;
     m_renderedText.clear();
     return rez;

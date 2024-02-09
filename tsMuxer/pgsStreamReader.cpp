@@ -11,7 +11,15 @@
 #include "vodCoreException.h"
 #include "vod_common.h"
 
+#ifndef NO_SUBTITLES
 using namespace text_subtitles;
+#else
+#define PCS_DEF_SEGMENT 0x16
+#define WINDOWS_DEF_SEGMENT 0x17
+#define PALETTE_DEF_SEGMENT 0x14
+#define OBJECT_DEF_SEGMENT 0x15
+#define END_DEF_SEGMENT 0x80
+#endif
 using namespace std;
 
 #define fabs(a) ((a) >= 0 ? (a) : -(a))
@@ -50,7 +58,9 @@ PGSStreamReader::PGSStreamReader()
     m_scaledRgbBuffer = nullptr;
     m_scaled_width = 0;
     m_scaled_height = 0;
+#ifndef NO_SUBTITLES
     m_render = new TextToPGSConverter(false);
+#endif
     m_renderedData = nullptr;
     m_fontBorder = 0;
     m_offsetId = 0xff;
@@ -112,6 +122,7 @@ int PGSStreamReader::calcFpsIndex(const double fps)
 
 void PGSStreamReader::readPalette(const uint8_t* pos, const uint8_t* end)
 {
+#ifndef NO_SUBTITLES
     m_palette.clear();
     m_palleteID = *pos++;
     m_paletteVersion = *pos++;
@@ -126,10 +137,12 @@ void PGSStreamReader::readPalette(const uint8_t* pos, const uint8_t* end)
         if (color.alpha != 0)
             m_palette.insert(make_pair(index, color));
     }
+#endif
 }
 
 void PGSStreamReader::yuvToRgb(const int minY) const
 {
+#ifndef NO_SUBTITLES
     const uint8_t* src = m_imgBuffer;
     const int size = m_video_width * m_video_height;
     const uint8_t* end = src + size;
@@ -153,6 +166,7 @@ void PGSStreamReader::yuvToRgb(const int minY) const
         else
             *dst++ = zeroRgb;
     }
+#endif
 }
 
 void PGSStreamReader::decodeRleData(const int xOffset, const int yOffset) const
@@ -203,6 +217,7 @@ void PGSStreamReader::decodeRleData(const int xOffset, const int yOffset) const
 
 static constexpr int Y_THRESHOLD = 33;
 
+#ifndef NO_SUBTITLES
 int PGSStreamReader::readObjectDef(const uint8_t* pos, const uint8_t* end)
 {
     pos += 4;  // skip object ID and version number
@@ -260,9 +275,11 @@ int PGSStreamReader::readObjectDef(const uint8_t* pos, const uint8_t* end)
     }
     return 0;
 }
+#endif
 
 void PGSStreamReader::rescaleRGB(const BitmapInfo* bmpDest, const BitmapInfo* bmpRef)
 {
+#ifndef NO_SUBTITLES
     const double xFactor = static_cast<double>(bmpRef->Width) / static_cast<double>(bmpDest->Width);
     const double yFactor = static_cast<double>(bmpRef->Height) / static_cast<double>(bmpDest->Height);
     RGBQUAD* ImagePixels = bmpDest->buffer;
@@ -304,8 +321,10 @@ void PGSStreamReader::rescaleRGB(const BitmapInfo* bmpDest, const BitmapInfo* bm
             ImagePixels++;
         }
     }
+#endif
 }
 
+#ifndef NO_SUBTITLES
 void PGSStreamReader::renderTextShow(int64_t inTime)
 {
     m_renderedBlocks.clear();
@@ -390,6 +409,7 @@ void PGSStreamReader::renderTextHide(int64_t outTime)
     rLen = m_render->composeEnd(curPos, outTime - 90, outTime - 90, m_demuxMode);
     m_renderedBlocks.emplace_back(outTime - 90, outTime - 90, rLen, curPos);
 }
+#endif
 
 int64_t getTimeValueNano(uint8_t* pos)
 {
@@ -442,6 +462,7 @@ int PGSStreamReader::readPacket(AVPacket& avPacket)
 
     if (m_video_height == 0)
     {
+#ifndef NO_SUBTITLES
         intDecodeStream(m_curPos, m_bufEnd - m_curPos);
         if (m_video_height == 0)
             return NEED_MORE_DATA;
@@ -476,6 +497,9 @@ int PGSStreamReader::readPacket(AVPacket& avPacket)
                    "Change PGS resolution from " << m_video_width << ':' << m_video_height << " to " << m_scaled_width
                                                  << ':' << m_scaled_height
                                                  << ". Scaling method: Bilinear interpolation");
+#else
+        return NEED_MORE_DATA;
+#endif
     }
 
     if (m_state == State::stAVPacketFragmented)
@@ -617,6 +641,7 @@ int PGSStreamReader::readPacket(AVPacket& avPacket)
                 memset(m_imgBuffer, 0xff, static_cast<size_t>(m_video_width) * m_video_height);
                 memset(m_rgbBuffer, 0x00, static_cast<size_t>(m_video_width) * m_video_height * 4);
                 memset(m_scaledRgbBuffer, 0x00, static_cast<size_t>(m_scaled_width) * m_scaled_height * 4);
+#ifndef NO_SUBTITLES
                 if (readObjectDef(m_curPos, m_curPos + segment_len) == NEED_MORE_DATA)
                 {
                     m_tmpBufferLen = m_bufEnd - m_curPos;
@@ -624,6 +649,9 @@ int PGSStreamReader::readPacket(AVPacket& avPacket)
                     return NEED_MORE_DATA;
                 }
                 renderTextShow(m_maxPTS);
+#else
+                return NEED_MORE_DATA;
+#endif
             }
             break;
         case PCS_DEF_SEGMENT:
@@ -640,8 +668,12 @@ int PGSStreamReader::readPacket(AVPacket& avPacket)
             {
                 composition_object(bitReader);
             }
+#ifndef NO_SUBTITLES
             if (composition_state != CompositionState::csEpochStart && m_needRescale)
                 renderTextHide(m_maxPTS);
+#else
+            return NEED_MORE_DATA;
+#endif
             break;
         case WINDOWS_DEF_SEGMENT:
             // Window Definition Segment
@@ -822,10 +854,12 @@ int PGSStreamReader::writeAdditionData(uint8_t* dstBuffer, uint8_t* dstEnd, AVPa
 
 void PGSStreamReader::setVideoInfo(const uint16_t width, const uint16_t height, const double fps)
 {
+#ifndef NO_SUBTITLES
     m_scaled_width = width;
     m_scaled_height = height;
     m_newFps = fps;
     if (width && height)
         m_render->enlargeCrop(width, height, &m_scaled_width, &m_scaled_height);
     m_render->setVideoInfo(m_scaled_width, m_scaled_height, m_newFps);
+#endif
 }

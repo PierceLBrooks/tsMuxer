@@ -7,7 +7,9 @@
 #include "avCodecs.h"
 #include "avPacket.h"
 #include "pgsStreamReader.h"
+#ifndef NO_SUBTITLES
 #include "textSubtitles.h"
+#endif
 #include "utf8Converter.h"
 
 class SRTStreamReader final : public AbstractStreamReader
@@ -36,14 +38,20 @@ class SRTStreamReader final : public AbstractStreamReader
     }
     void setVideoInfo(const uint16_t width, const uint16_t height, const double fps) const
     {
+#ifndef NO_SUBTITLES
         m_srtRender->setVideoInfo(width, height, fps);
         const auto pgsReader = dynamic_cast<PGSStreamReader*>(m_dstSubCodec);
         if (pgsReader)
             pgsReader->setVideoInfo(0, 0, fps);
+#endif
     }
+#ifndef NO_SUBTITLES
     void setFont(const text_subtitles::Font& font) const { m_srtRender->m_textRender->setFont(font); }
     void setAnimation(const text_subtitles::TextAnimation& animation);
     void setBottomOffset(const int offset) const { m_srtRender->setBottomOffset(offset); }
+#else
+    void setBottomOffset(const int offset) const { }
+#endif
 
    protected:
     int writeAdditionData(uint8_t* dstBuffer, uint8_t* dstEnd, AVPacket& avPacket,
@@ -59,7 +67,9 @@ class SRTStreamReader final : public AbstractStreamReader
     int m_processedSize;
     int32_t m_charSize;
     AbstractStreamReader* m_dstSubCodec;
+#ifndef NO_SUBTITLES
     text_subtitles::TextToPGSConverter* m_srtRender;
+#endif
     bool m_lastBlock;
     int parseText(uint8_t* dataStart, size_t len);
     std::vector<uint8_t> m_tmpBuffer;
@@ -71,7 +81,9 @@ class SRTStreamReader final : public AbstractStreamReader
     uint16_t m_short_N;
     uint32_t m_long_R;
     uint32_t m_long_N;
+#ifndef NO_SUBTITLES
     text_subtitles::TextAnimation m_animation;
+#endif
 
     enum class ParseState
     {

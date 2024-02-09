@@ -1016,6 +1016,7 @@ AbstractStreamReader* METADemuxer::createCodec(const string& codecName, const ma
     }
     else if (codecName == "S_TEXT/UTF8")
     {
+#ifndef NO_SUBTITLES
         auto srtReader = new SRTStreamReader();
         rez = srtReader;
         text_subtitles::Font font;
@@ -1076,6 +1077,7 @@ AbstractStreamReader* METADemuxer::createCodec(const string& codecName, const ma
         srtReader->setVideoInfo(srtWidth, srtHeight, fps);
         srtReader->setFont(font);
         srtReader->setAnimation(animation);
+#endif
     }
     else
         THROW(ERR_UNKNOWN_CODEC, "Unsupported codec " << codecName)
